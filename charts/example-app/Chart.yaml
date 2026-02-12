@@ -1,0 +1,10 @@
+apiVersion: v2
+name: example-app
+description: >
+  Minimal chart the example-app-pipeline.yml workflow and
+  Jenkinsfile.example actually deploy. Exists so those example
+  pipelines in this repo have something real to point at instead of a
+  ./charts/example-app path that used to lead nowhere.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
