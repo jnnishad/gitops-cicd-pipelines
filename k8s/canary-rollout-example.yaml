@@ -1,0 +1,61 @@
+# Argo Rollouts canary example — gradually shifts traffic to the new
+# version with automated analysis (error rate) gating each step. Falls
+# back to a plain Deployment + Service blue-green pattern
+# (blue-green-service.yaml) in clusters without Argo Rollouts installed.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: example-app
+  namespace: production
+spec:
+  replicas: 6
+  strategy:
+    canary:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 5m }
+        - analysis:
+            templates:
+              - templateName: error-rate-check
+        - setWeight: 30
+        - pause: { duration: 5m }
+        - setWeight: 60
+        - pause: { duration: 5m }
+        - setWeight: 100
+  selector:
+    matchLabels:
+      app: example-app
+  template:
+    metadata:
+      labels:
+        app: example-app
+    spec:
+      containers:
+        - name: example-app
+          image: registry.internal/example-app:latest
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: error-rate-check
+  namespace: production
+spec:
+  metrics:
+    - name: error-rate
+      interval: 1m
+      successCondition: result < 0.05
+      provider:
+        prometheus:
+          address: http://mimir-nginx.monitoring.svc.cluster.local/prometheus
+          query: |
+            sum(rate(http_requests_total{app="example-app",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{app="example-app"}[5m]))

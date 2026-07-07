@@ -1,0 +1,42 @@
+# Example of how an application repo wires the two reusable workflows
+# together into build -> test -> scan -> deploy-to-staging -> deploy-to-prod.
+# This file lives here for reference; copy it into the app repo's
+# .github/workflows/ and adjust image/chart names.
+
+name: App CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    uses: jnnishad/gitops-cicd-pipelines/.github/workflows/reusable-build-test-scan.yml@main
+    with:
+      image_name: example-app
+    secrets: inherit
+
+  deploy-staging:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    uses: jnnishad/gitops-cicd-pipelines/.github/workflows/reusable-k8s-deploy.yml@main
+    with:
+      environment: staging
+      release_name: example-app
+      chart_path: ./charts/example-app
+      image_tag: ${{ github.sha }}
+      namespace: staging
+    secrets: inherit
+
+  deploy-prod:
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main'
+    uses: jnnishad/gitops-cicd-pipelines/.github/workflows/reusable-k8s-deploy.yml@main
+    with:
+      environment: production
+      release_name: example-app
+      chart_path: ./charts/example-app
+      image_tag: ${{ github.sha }}
+      namespace: production
+    secrets: inherit

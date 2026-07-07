@@ -1,0 +1,54 @@
+# Plain blue-green pattern for clusters without Argo Rollouts: two
+# Deployments (blue/green), one Service whose selector is flipped between
+# them. Cutover is a single `kubectl patch`, rollback is the same command
+# with the previous color — no rebuild required.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-app-blue
+  namespace: production
+  labels: { app: example-app, color: blue }
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: example-app, color: blue }
+  template:
+    metadata:
+      labels: { app: example-app, color: blue }
+    spec:
+      containers:
+        - name: example-app
+          image: registry.internal/example-app:v1.4.0
+          ports: [{ containerPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-app-green
+  namespace: production
+  labels: { app: example-app, color: green }
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: example-app, color: green }
+  template:
+    metadata:
+      labels: { app: example-app, color: green }
+    spec:
+      containers:
+        - name: example-app
+          image: registry.internal/example-app:v1.5.0
+          ports: [{ containerPort: 8080 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-app
+  namespace: production
+spec:
+  selector:
+    app: example-app
+    color: blue   # flip to "green" to cut over: kubectl patch svc example-app -p '{"spec":{"selector":{"color":"green"}}}'
+  ports:
+    - port: 80
+      targetPort: 8080

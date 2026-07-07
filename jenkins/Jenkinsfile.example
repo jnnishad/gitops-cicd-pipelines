@@ -1,0 +1,74 @@
+// Example Jenkinsfile using the shared library functions in vars/.
+// Kept alongside GitHub Actions (reusable-*.yml) for teams mid-migration
+// or running hybrid CI where some legacy jobs still live in Jenkins.
+//
+// Load the shared library in Jenkins under: Manage Jenkins > System >
+// Global Pipeline Libraries, pointing at this repo, name "gitops-pipelines".
+
+@Library('gitops-pipelines') _
+
+pipeline {
+    agent { label 'docker' }
+
+    parameters {
+        string(name: 'IMAGE_TAG', defaultValue: env.GIT_COMMIT ?: 'latest')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+
+        stage('Test') {
+            steps { sh 'make test' }
+        }
+
+        stage('SonarQube') {
+            steps { sonarQubeScan(projectKey: 'example-app') }
+        }
+
+        stage('Build Image') {
+            steps {
+                buildDockerImage(
+                    imageName: 'registry.internal/example-app',
+                    tag: params.IMAGE_TAG,
+                    dockerfile: 'Dockerfile'
+                )
+            }
+        }
+
+        stage('Deploy to Staging') {
+            steps {
+                deployToKubernetes(
+                    releaseName: 'example-app',
+                    chartPath: './charts/example-app',
+                    namespace: 'staging',
+                    imageTag: params.IMAGE_TAG
+                )
+            }
+        }
+
+        stage('Approve Production') {
+            steps {
+                input message: 'Deploy to production?', ok: 'Deploy'
+            }
+        }
+
+        stage('Deploy to Production') {
+            steps {
+                deployToKubernetes(
+                    releaseName: 'example-app',
+                    chartPath: './charts/example-app',
+                    namespace: 'production',
+                    imageTag: params.IMAGE_TAG
+                )
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "Pipeline failed — check JFrog Artifactory build info for ${params.IMAGE_TAG}"
+        }
+    }
+}

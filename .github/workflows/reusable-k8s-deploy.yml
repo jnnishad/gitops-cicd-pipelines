@@ -1,0 +1,53 @@
+# Reusable workflow: deploy an image tag to Kubernetes via Helm, with a
+# manual approval gate on production environments (configure branch
+# protection / environment reviewers in the calling repo).
+
+name: Reusable - Kubernetes Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      release_name:
+        required: true
+        type: string
+      chart_path:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+      namespace:
+        required: false
+        type: string
+        default: "default"
+    secrets:
+      KUBE_CONFIG:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+
+      - uses: azure/setup-helm@v4
+
+      - name: Helm upgrade --install
+        run: |
+          helm upgrade --install "${{ inputs.release_name }}" "${{ inputs.chart_path }}" \
+            --namespace "${{ inputs.namespace }}" --create-namespace \
+            --set image.tag="${{ inputs.image_tag }}" \
+            --wait --timeout 5m \
+            --atomic
+
+      - name: Verify rollout
+        run: kubectl rollout status deployment/"${{ inputs.release_name }}" -n "${{ inputs.namespace }}" --timeout=120s
