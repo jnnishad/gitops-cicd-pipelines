@@ -10,6 +10,14 @@ on:
     branches: [main]
   pull_request:
 
+# The reusable build-and-scan job pushes the built image, so it needs
+# packages: write. A caller workflow can only grant a reusable workflow
+# permissions up to its own ceiling -- without this block the default
+# GITHUB_TOKEN grant is packages: read, and the call fails at startup.
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     uses: jnnishad/gitops-cicd-pipelines/.github/workflows/reusable-build-test-scan.yml@main
