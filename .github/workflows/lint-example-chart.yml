@@ -1,0 +1,17 @@
+name: Lint example chart
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: helm lint
+        run: helm lint charts/example-app
+      - name: helm template (catches rendering errors lint alone can miss)
+        run: helm template test-release charts/example-app --set image.tag=1.25.3 > /dev/null

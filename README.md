@@ -45,8 +45,8 @@ jobs:
     uses: jnnishad/gitops-cicd-pipelines/.github/workflows/reusable-k8s-deploy.yml@main
     with:
       environment: production
-      release_name: my-app
-      chart_path: ./charts/my-app
+      release_name: example-app
+      chart_path: ./charts/example-app
       image_tag: ${{ github.sha }}
     secrets: inherit
 ```
