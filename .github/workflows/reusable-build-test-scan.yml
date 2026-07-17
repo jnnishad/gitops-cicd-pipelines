@@ -31,6 +31,12 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # `secrets.*` cannot be referenced inside a step `if:` condition --
+    # GitHub Actions rejects it at parse time ("Unrecognized named-value:
+    # 'secrets'"), not just at runtime. Mapping it into a job-level `env:`
+    # first works around that, since the `env` context *is* allowed in `if:`.
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,10 +49,10 @@ jobs:
           else echo "No recognized test runner, skipping"; fi
 
       - name: SonarQube scan
-        if: ${{ secrets.SONAR_TOKEN != '' }}
+        if: ${{ env.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarqube-scan-action@v2
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
 
   build-and-scan:
     needs: test
